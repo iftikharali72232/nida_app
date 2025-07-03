@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Admin\NotificationController;
+use App\Mail\OTPMail;
+use App\Mail\SendOtpMail;
 use App\Models\Bank;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,85 +17,312 @@ use App\Models\Shop;
 use App\Rules\ValidMobileNumber;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 class AuthController extends Controller
 {
-    //Register User
-    public function register(Request $request)
-    {
-        // print_r($request->name_ar); exit;
-        $attrs = $request->validate([
-            "name"=> "required|string",
-            "password"=> "required|min:6",
-            'mobile' => 'required|unique:users',
-            'user_type'=> 'required|int',
-        ]);
-        $file_name = "";
-        if(isset($_FILES['image']))
-        {
-            $file_name = $this->upload($request);
-        }
-        $ussr = User::where('email', $request->email)
-            ->whereNotNull('email')
-            ->first();
 
-        if($ussr)
-        {
-            return response([
-                "message" => "Email is duplicate, please try with another email..!",
-                'user' => $ussr
-            ]);
-        }
-        $status = 1;
-        if($request->user_type == 2)
-        {
-            $status = 0;
-        }
-        $randomNumber = rand(100000, 999999);
-        $user = User::create([
-            "name"=> $attrs["name"],
-            "name_ar"=> $request->name_ar,
-            "email"=> $request->email ?? NULL,
-            "mobile" => $attrs["mobile"],
-            "user_type" => $attrs['user_type'],
-            "password"=> bcrypt($attrs["password"]),
-            "image"=> $file_name,
-            "otp"=> $randomNumber,
-            "street_address" => $request->address,
-            "status"=> $status,
-            "country" => $request->country,
+      public function register(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users',
+            'mobile' => 'required|numeric|unique:users',
+            'password' => 'required|string|min:6|confirmed',
+            'user_type' => 'required|int',
         ]);
-        if(!empty($file_name))
-        {
-            $imageUrl = asset('images/'.$file_name);
-            $user['imageUrl'] = $imageUrl;
-        } 
-       
-        if($user)
-        {
-             Wallet::create([
-                'user_id' => $user->id
-            ]);
-            $data = [
-                'user_id' => $user->id,
-                'text_en' => "Account created successfully.",
-                'text_ar' => "تم إنشاء الحساب بنجاح.",
-                'request_id' => 0,
-                'page' => $request->page
-            ];
-            storeNotification($data);
-            return response([
-                'users' => $user,
-                'token' => $status == 1 ? $user->createToken('secret')->plainTextToken : "",
-            ]);
-        } else {
-            return response([
-                "message" => "Something went wrong."
-            ]);
-        }
+    
+        $validated['password'] = Hash::make($validated['password']);
         
+        // Generate a random 6-digit OTP
+        $otp = random_int(100000, 999999);
+        
+        // Set OTP expiration (5 minutes from now)
+        $validated['otp'] = $otp;
+        $validated['otp_expiry'] = now()->addMinutes(5);
+        $validated['is_verify'] = 0; // User is not verified yet
+        
+        // Save the user data along with the OTP
+        $user = User::create($validated);
+    
+        // Send the OTP email
+        Mail::to($request->email)->send(new OTPMail($otp));
+    
+        return response()->json([
+            'message' => 'User registered successfully. Please verify your email using the OTP.',
+            'user' => $user,
+            // 'token' => $user->createToken('auth_token')->plainTextToken
+        ], 200);
     }
+
+    public function verifyOTP(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'otp' => 'required|numeric',
+        ]);
+        
+        $user = User::where('email', $validated['email'])->first();
+        // print_r($user->otp); exit;
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+
+        if ($user->otp !== $validated['otp']) {
+            return response()->json(['message' => 'Invalid OTP'], 400);
+        }
+
+        if (now()->greaterThan($user->otp_expiry)) {
+            return response()->json(['message' => 'OTP has expired'], 400);
+        }
+
+        // Mark the user as verified and clear the OTP
+        $user->update([
+            'is_verify' => 1,
+            'otp' => null,
+            'otp_expiry' => null,
+        ]);
+
+        return response()->json(['message' => 'OTP verified successfully'], 200);
+    }
+
+    public function resendOTP(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+        ]);
+    
+        $user = User::where('email', $validated['email'])->first();
+    
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+    
+        // Generate a new OTP and update the user record
+        $otp = random_int(100000, 999999);
+        $user->update([
+            'otp' => $otp,
+            'otp_expiry' => now()->addMinutes(5),
+        ]);
+    
+        // Send the OTP email
+        Mail::to($user->email)->send(new OTPMail($otp));
+    
+        return response()->json(['message' => 'A new OTP has been sent to your email'], 200);
+    }
+    public function forgotPassword(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        // Generate a random 6-digit OTP
+        $otp = random_int(100000, 999999);
+
+        // Update the user's OTP and expiry time
+        $user->update([
+            'otp' => $otp,
+            'otp_expiry' => now()->addMinutes(5),
+        ]);
+
+        // Send the OTP email
+        Mail::to($user->email)->send(new OTPMail($otp));
+
+        return response()->json(['message' => 'An OTP has been sent to your email'], 200);
+    }
+    public function resetPassword(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+            // 'otp' => 'required|numeric',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        // if ($user->otp !== (int)$validated['otp']) {
+        //     return response()->json(['message' => 'Invalid OTP'], 400);
+        // }
+
+        // if (now()->greaterThan($user->otp_expiry)) {
+        //     return response()->json(['message' => 'OTP has expired'], 400);
+        // }
+
+        // Reset the user's password and clear OTP fields
+        $user->update([
+            'password' => Hash::make($validated['password']),
+            'otp' => null,
+            'otp_expiry' => null,
+        ]);
+
+        return response()->json(['message' => 'Password reset successfully'], 200);
+    }
+
+    // public function updateUser(Request $request)
+    // {
+    //     $user = User::find(auth()->user()->id);
+
+    //     if (!$user) {
+    //         return response()->json(['message' => 'User not found'], 404);
+    //     }
+
+    //     $validated = $request->validate([
+    //         'name' => 'string|max:255',
+    //         'email' => 'email|unique:users,email,' . $user->id,
+    //         'mobile' => 'numeric|unique:users,mobile,' . $user->id,
+    //         'password' => 'nullable|string|min:6',
+    //         'function' => 'nullable|string',
+    //         // 'user_type' => 'string',
+    //     ]);
+
+    //     if (isset($validated['password'])) {
+    //         $validated['password'] = Hash::make($validated['password']);
+    //     }
+
+    //     $user->update($validated);
+
+    //     return response()->json([
+    //         'message' => 'User updated successfully',
+    //         'user' => $user,
+    //     ], 200);
+    // }
+    public function login(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+            'user_type' => 'required|integer|in:1,2', // Validate user_type as integer and only allow 1 or 2
+        ]);
+    
+        $user = User::where('email', $validated['email'])
+                    ->where('user_type', $validated['user_type'])
+                    ->first();
+    
+        // Check if user exists and password is valid
+        if (!$user || !Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Invalid email, password, or user type',
+            ], 401);
+        }
+    
+        // Check if user is verified
+        if (!$user->is_verify) {
+            return response()->json([
+                'message' => 'Your account is not verified. Please verify your email.',
+            ], 403); // 403 Forbidden
+        }
+    
+        // Check if user is approved by admin
+        if ($user->status == 0) {
+            return response()->json([
+                'message' => 'Your account is not approved by the admin yet.',
+            ], 403); // 403 Forbidden
+        }
+    
+        // Generate a token
+        $token = $user->createToken('auth_token')->plainTextToken;
+    
+        return response()->json([
+            'message' => 'Login successful',
+            'token' => $token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'mobile' => $user->mobile,
+                'user_type' => $user->user_type,
+            ],
+        ], 200);
+    }
+    //Register User
+    // public function register(Request $request)
+    // {
+    //     // print_r($request->name_ar); exit;
+    //     $attrs = $request->validate([
+    //         "name"=> "required|string",
+    //         "password"=> "required|min:6",
+    //         'mobile' => 'required|unique:users',
+    //         'email' => 'required|unique:users',
+    //         'user_type'=> 'required|int',
+    //     ]);
+    //     $file_name = "";
+    //     if(isset($_FILES['image']))
+    //     {
+    //         $file_name = $this->upload($request);
+    //     }
+    //     $ussr = User::where('email', $request->email)
+    //         ->whereNotNull('email')
+    //         ->first();
+
+    //     if($ussr)
+    //     {
+    //         return response([
+    //             "message" => "Email is duplicate, please try with another email..!",
+    //             'user' => $ussr
+    //         ]);
+    //     }
+    //     $status = 1;
+    //     if($request->user_type == 2)
+    //     {
+    //         $status = 0;
+    //     }
+    //     $randomNumber = rand(100000, 999999);
+    //     $user = User::create([
+    //         "name"=> $attrs["name"],
+    //         "name_ar"=> $request->name_ar,
+    //         "email"=> $request->email ?? NULL,
+    //         "mobile" => $attrs["mobile"],
+    //         "user_type" => $attrs['user_type'],
+    //         "password"=> bcrypt($attrs["password"]),
+    //         "image"=> $file_name,
+    //         "otp"=> $randomNumber,
+    //         "street_address" => $request->address,
+    //         "status"=> $status,
+    //         "country" => $request->country,
+    //     ]);
+    //     if(!empty($file_name))
+    //     {
+    //         $imageUrl = asset('images/'.$file_name);
+    //         $user['imageUrl'] = $imageUrl;
+    //     } 
+       
+    //     if($user)
+    //     {
+    //          Wallet::create([
+    //             'user_id' => $user->id
+    //         ]);
+    //         $data = [
+    //             'user_id' => $user->id,
+    //             'text_en' => "Account created successfully.",
+    //             'text_ar' => "تم إنشاء الحساب بنجاح.",
+    //             'request_id' => 0,
+    //             'page' => $request->page
+    //         ];
+    //         storeNotification($data);
+    //         return response([
+    //             'users' => $user,
+    //             'token' => $status == 1 ? $user->createToken('secret')->plainTextToken : "",
+    //         ]);
+    //     } else {
+    //         return response([
+    //             "message" => "Something went wrong."
+    //         ]);
+    //     }
+        
+    // }
 
     public function bankList()
     {
@@ -272,7 +501,7 @@ class AuthController extends Controller
         // print_r($request->name_ar); exit;
         $attrs = $request->validate([
             "name"=> "required|string",
-            // "email"=> "required|email",
+            "email"=> "required|email",
             'mobile' => 'required',
         ]);
         
@@ -333,65 +562,65 @@ class AuthController extends Controller
         
     }
   // login user
-  public function login(Request $request)
-  {
-      $attrs = $request->validate([
-          "mobile"=> "required|string",
-          "password"=> "required|min:6",
-          "device_token" => "required",
-          'user_type' => 'required|int'
-      ]);
-      $data = $attrs;
-      unset($data['device_token']);
-     $user = User::where('mobile', $attrs['mobile'])->first();
-     if(!$user)
-     {
-        $user = User::where('email', $attrs['mobile'])->first();
-     }
-     if($user)
-     {//    print_r($user->mobile); exit;
-          if($user->user_type == 1 && $user->status == 0)
-          {
-              return response([
-                  'message' => "Your account is inactive pls contact to the support to make active your account.",
-              ], 403);
-          } else if($user->user_type == 2 && $user->status == 0)
-          {
-              return response([
-                  'message' => "Your account status is inactive pls contact to the support to make active your account.",
-              ], 403);
-          }
-          if($user->user_type != $request->user_type)
-          {
-                return response([
-                    'message' => "user_type does not matched",
-                ]);
-          }
-          if(!Auth::attempt($data)) {
-              return response([
-                  'message' => "Invalid Credentials.",
-              ], 403);
-          }
+//   public function login(Request $request)
+//   {
+//       $attrs = $request->validate([
+//           "email"=> "required|string",
+//           "password"=> "required|min:6",
+//           "device_token" => "required",
+//           'user_type' => 'required|int'
+//       ]);
+//       $data = $attrs;
+//       unset($data['device_token']);
+//      $user = User::where('email', $attrs['email'])->first();
+//      if(!$user)
+//      {
+//         $user = User::where('mobile', $attrs['email'])->first();
+//      }
+//      if($user)
+//      {//    print_r($user->mobile); exit;
+//           if($user->user_type == 1 && $user->status == 0)
+//           {
+//               return response([
+//                   'message' => "Your account is inactive pls contact to the support to make active your account.",
+//               ], 403);
+//           } else if($user->user_type == 2 && $user->status == 0)
+//           {
+//               return response([
+//                   'message' => "Your account status is inactive pls contact to the support to make active your account.",
+//               ], 403);
+//           }
+//           if($user->user_type != $request->user_type)
+//           {
+//                 return response([
+//                     'message' => "user_type does not matched",
+//                 ]);
+//           }
+//           if(!Auth::attempt($data)) {
+//               return response([
+//                   'message' => "Invalid Credentials.",
+//               ], 403);
+//           }
 
-          DB::table('users')->where('id', $user->id)->update([
-              'device_token' => $attrs['device_token']
-          ]);
-          $user = User::where('mobile', $attrs['mobile'])->first();
-          if(!$user)
-          {
-             $user = User::where('email', $attrs['mobile'])->first();
-          }
-              return response([
-                  'user' => $user,
-                  'token' => auth()->user()->createToken('secret')->plainTextToken,
-              ], 200);
-     } else {
-          return response([
-              'message' => "User not found",
-          ], 403);
-     }
+//           DB::table('users')->where('id', $user->id)->update([
+//               'device_token' => $attrs['device_token']
+//           ]);
+//           $user = User::where('mobile', $attrs['mobile'])->first();
+//           if(!$user)
+//           {
+//              $user = User::where('email', $attrs['mobile'])->first();
+//           }
+//               return response([
+//                   'user' => $user,
+//                   'token' => auth()->user()->createToken('secret')->plainTextToken,
+//               ], 200);
+//      } else {
+//           return response([
+//               'message' => "User not found",
+//           ], 403);
+//      }
   
-  }
+//   }
 
     //logout user
     public function logout(){

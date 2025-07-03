@@ -59,6 +59,10 @@ Route::post('/receiverAddressUpdate', [RequestController::class, 'receiverAddres
 Route::prefix("/user")->group(function () {
     Route::post("/login", [AuthController::class,"login"])->name('login');
     Route::post("/register", [AuthController::class,"register"])->name('register');
+    Route::post('/verifyOTP', [AuthController::class, 'verifyOTP'])->name('verifyOTP');
+    Route::post('/resend-otp', [AuthController::class, 'resendOTP'])->name('resend-otp');
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password');
 });
 // protected routes
 Route::group(["middleware"=> "auth:sanctum"], function () {

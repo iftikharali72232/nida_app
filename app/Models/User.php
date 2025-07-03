@@ -4,7 +4,6 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -30,13 +29,14 @@ class User extends Authenticatable
         'address',
         'country',
         'otp',
-        'category_id',
-        'driving_license',
-        'bank_id',
-        'bank_account',
+        'otp_expiry',
+        'is_verify',
+        'function',
+        'job_number',
+        'description',
+        'face_id',
         'device_token',
-        'team_id',
-        'is_available'
+        'notification_status'
     ];
 
     /**
@@ -63,9 +63,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Order::class);
     }
-    public function notifications(): HasMany
+    public function notifications()
     {
-        return $this->hasMany(Notification::class, 'user_id');
+        return $this->hasMany(Notification::class);
     }
 
     public static function sendNotification($data)
@@ -80,8 +80,8 @@ class User extends Authenticatable
             $url = 'https://fcm.googleapis.com/v1/projects/'.getenv('DRIVER_PROJECT_ID').'/messages:send';
 
             // Set your client credentials and refresh token
-            $client_id = getenv('GOOGLE_CLIENT_ID');
-            $client_secret = getenv('GOOGLE_CLIENT_SECRET');
+            $client_id = getenv('GOOGLE_CLIENT_ID_d');
+            $client_secret = getenv('GOOGLE_CLIENT_SECRET_d');
             $refresh_token = getenv('DRIVER_REFRESH_TOKEN'); // Replace with your actual refresh token
         } else {
             $url = 'https://fcm.googleapis.com/v1/projects/'.getenv('DELIVERY_PROJECT_ID').'/messages:send';
@@ -277,16 +277,4 @@ class User extends Authenticatable
     //     return json_decode($result, true);
     // }
 
-    public function team()
-    {
-        return $this->belongsTo(Team::class, 'team_id');
-    }
-    public function chats()
-    {
-        return $this->hasMany(Chat::class);
-    }
-    public function wallet()
-    {
-        return $this->hasOne(Wallet::class);
-    }
 }
