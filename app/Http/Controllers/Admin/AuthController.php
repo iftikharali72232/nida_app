@@ -42,7 +42,8 @@ class AuthController extends Controller
         $validated['otp'] = $otp;
         $validated['otp_expiry'] = now()->addMinutes(5);
         $validated['is_verify'] = 0; // User is not verified yet
-        
+        $validated['status'] = 1; // User is active
+
         // Save the user data along with the OTP
         $user = User::create($validated);
     
@@ -968,5 +969,82 @@ class AuthController extends Controller
         // $data['device_token'] = $user->device_token;
 
         return response()->json(['msg' => sendNotification($data)]);
+    }
+     private function findUser($request)
+    {
+        // Assume you pass `user_id` in request for simplicity
+        return User::findOrFail($request->user_id);
+    }
+
+    public function updateName(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'name' => 'required|string|max:100'
+        ]);
+
+        $user = $this->findUser($request);
+        $user->name = $request->name;
+        $user->save();
+
+        return response()->json(['status' => true, 'message' => 'Name updated', 'data' => $user]);
+    }
+
+    public function updateEmail(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'email' => 'required|email|unique:users,email,' . $request->user_id
+        ]);
+
+        $user = $this->findUser($request);
+        $user->email = $request->email;
+        $user->save();
+
+        return response()->json(['status' => true, 'message' => 'Email updated', 'data' => $user]);
+    }
+
+    public function updateMobile(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'mobile' => 'required|string|max:20'
+        ]);
+
+        $user = $this->findUser($request);
+        $user->mobile = $request->mobile;
+        $user->save();
+
+        return response()->json(['status' => true, 'message' => 'Mobile updated', 'data' => $user]);
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'password' => 'required|string|min:6|confirmed'
+        ]);
+
+        $user = $this->findUser($request);
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        return response()->json(['status' => true, 'message' => 'Password updated']);
+    }
+
+    public function updateImage(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'image' => 'required|image|mimes:jpg,jpeg,png|max:2048'
+        ]);
+
+        $user = $this->findUser($request);
+
+
+        $user->image = $this->upload($request);
+        $user->save();
+
+        return response()->json(['status' => true, 'message' => 'Image updated', 'data' => $user]);
     }
 }

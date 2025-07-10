@@ -25,6 +25,7 @@ use App\Http\Controllers\ChatApiController;
 use App\Http\Controllers\Location;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ServiceOfferController;
+use App\Http\Controllers\Admin\TokenController;
 
 /*
 |--------------------------------------------------------------------------
@@ -222,4 +223,16 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
     });
     // Laravel API Route
      Route::post('/reviews', [ReviewController::class, 'store']);
+
+     // routes/api.php
+
+
+    Route::get('/tokens', [TokenController::class, 'index']);
+    Route::post('/tokens/assign', [TokenController::class, 'assign']);
+
+    Route::post('/user/update-name', [AuthController::class, 'updateName']);
+    Route::post('/user/update-email', [AuthController::class, 'updateEmail']);
+    Route::post('/user/update-mobile', [AuthController::class, 'updateMobile']);
+    Route::post('/user/update-password', [AuthController::class, 'updatePassword']);
+    Route::post('/user/update-image', [AuthController::class, 'updateImage']);
 });
