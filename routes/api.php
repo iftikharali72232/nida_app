@@ -84,9 +84,14 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
     Route::post('/addOffer', [OfferController::class, 'addOffer'])->name('addOffer');
     Route::post('/declineOffer', [OfferController::class, 'declineOffer'])->name('declineOffer');
 
-    
-    Route::get('/dashboardRequest', [CategoryController::class, 'dashboardRequest'])->name('dashboardRequest');
-    Route::get('/currentRidesList', [CategoryController::class, 'currentRidesList'])->name('currentRidesList');
+
+    Route::get('/dashboard-request', [CategoryController::class, 'dashboardRequest'])->name('dashboardRequest');
+    Route::post('/vistedShops', [CategoryController::class, 'vistedShops'])->name('vistedShops');
+    Route::post('/fvrtShops', [CategoryController::class, 'fvrtShops'])->name('fvrtShops');
+    Route::get('/shopDetails/{shop_id}', [CategoryController::class, 'shop_details'])->name('shopDetails');
+    Route::post('/markShopAsFvrt', [CategoryController::class, 'markShopAsFvrt'])->name('markShopAsFvrt');
+    Route::post('/removeShopAsFvrt', [CategoryController::class, 'removeShopAsFvrt'])->name('removeShopAsFvrt');
+
 
     // history section 
     Route::post('/createHistory', [HistoryController::class, 'createHistory'])->name('createHistory');
@@ -140,6 +145,7 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
     Route::post('/updateProduct/{id}', [ProductController::class, 'updateProduct'])->name('updateProduct');
     Route::get('/allProducts/{id}', [ProductController::class,'products'])->name('allProducts');
     Route::get('/sellerProducts', [ProductController::class, 'sellerProducts'])->name('sellerProducts');
+    Route::post('/products/{id}/delete', [ProductController::class, 'delete']);
 
     // Cart requests
     Route::post('/cart', [CartController::class,'cart'])->name('cart');

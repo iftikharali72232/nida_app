@@ -13,8 +13,10 @@ class Category extends Model
         "name",
         "name_ar",
         "image",
-        "created_by",
+        "description_ar",
         "description",
+        'status',
+        'admin_choice',
     ];
     protected $hidden = [
     ];

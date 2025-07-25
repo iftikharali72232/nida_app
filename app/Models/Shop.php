@@ -12,15 +12,10 @@ class Shop extends Model
 
     protected $fillable = [
         "name",
-        "name_ar",
-        "logo",
-        "category_id",
-        "location",
-        "reg_no",
-        "created_by",
-        "description",
-        "latitude",
-        "longitude"
+        "user_id",
+        "fvrt",
+        "visted",
+        "shop_id",
     ];
     protected $hidden = [
     ];

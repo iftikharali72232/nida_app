@@ -17,213 +17,239 @@ class ProductController extends Controller
     //
     public function createProduct(Request $request)
     {
-        
-        // print_r($_POST); exit;
         $attrs = $request->validate([
-            "p_name"=> "required|string",
-            "p_name_ar"=> "required|string",
-            "category_id"=> "required|int",
-            "price"=> "required|numeric",
-            ]);
+            "p_name"         => "required|string|max:255",
+            "p_name_ar"      => "nullable|string|max:255",
+            "category_id"    => "required|integer",
+            "price"          => "required|numeric",
+            "tax"            => "nullable|string", // because it might be like "10%"
+            "discount"       => "nullable|string", // same
+            "taxable"        => "nullable|integer|in:0,1",
+            "tax_inclusive"  => "nullable|integer|in:0,1",
+            "status"         => "nullable|integer|in:0,1",
+            "description"    => "nullable|string",
+            "description_ar" => "nullable|string",
+            "extra_options"  => "nullable|string",
+            "images.*"       => "nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048"
+        ]);
 
-        // check if tax in percentage
-        if(strpos($request->tax, "%") !== false)
-        {
-            // echo $request->tax; exit;
-            $tax_value = doubleval(str_replace("%","",$request->tax));
-            $tax_value = doubleval(($request->price*$tax_value)/100);
-            // echo $tax_value; exit;
-        } else {
-            $tax_value = $request->tax;
-        }
+        $price = round($attrs["price"], 2);
 
-        // check if discount in percentage
-        if(strpos($request->discount, "%") !== false)
-        {
-            // echo $request->discount; exit;
-            $discount_value = doubleval(str_replace("%","",$request->discount));
-            $discount_value = doubleval(($request->price*$discount_value)/100);
-            // echo $discount_value; exit;
-        } else {
-            $discount_value = $request->discount;
-        }
-
-
-        // check if product name already exists
-        $product = DB::select("SELECT * FROM products WHERE p_name=:name", [':name' => $attrs['p_name']]);
-        if(!empty($product))
-        {
-            return response([
-                'status' => "0",
-                'message' => "Product already exist"
-            ], 200);
-        }
-
-        // check shop
-        $category = DB::select("SELECT * FROM categories WHERE id=:id AND status=:status",[':id' => $attrs['category_id'], ':status' => 1]);
-        if($category)
-        {
-
-            $images = [];
-            if(isset($_FILES['images']))
-            {
-                // print_r($_FILES['images']); exit;
-                if ($request->hasFile('images')) {
-                    foreach ($request->file('images') as $image) {
-                        
-                        $imageName = time() . '_' . $image->getClientOriginalName();
-                        $image->move(public_path('images'), $imageName);
-                        // You may also store the image information in the database if needed.
-                        $images[] = $imageName;
-                    }
-        
-                }
-            }
-            $shop = Shop::where('created_by', auth()->user()->id)->first();
-            $product = Product::create([
-                "p_name"=> $attrs["p_name"],
-                "p_name_ar"=> $attrs["p_name_ar"],
-                "price"=> round($attrs["price"],2),
-                "category_id"=> $attrs['category_id'],
-                "shop_id" => $shop->id,
-                "created_by"=> auth()->user()->id,
-                "images"=> json_encode($images),
-                "description" => $request->description,
-                "tax" => round($tax_value, 2),
-                "discount" => round($discount_value, 2),
-                "taxable" => $request->taxable,
-                "tax_inclusive" => $request->tax_inclusive,
-            ]);
-
-            if($product)
-            {
-                $product['image_base_url'] = asset("images/");
-                return response([
-                    "status" => "1",
-                    "product" => $product
-                ], 200);
+        // Tax
+        $tax_value = 0;
+        if (!empty($request->tax)) {
+            if (strpos($request->tax, "%") !== false) {
+                $tax_percent = doubleval(str_replace("%", "", $request->tax));
+                $tax_value   = round(($price * $tax_percent) / 100, 2);
             } else {
-                return response([
-                    "status"=> "0",
-                    "message" => "Something went wrong"
-                ]);
+                $tax_value = doubleval($request->tax);
             }
+        }
+
+        // Discount
+        $discount_value = 0;
+        if (!empty($request->discount)) {
+            if (strpos($request->discount, "%") !== false) {
+                $discount_percent = doubleval(str_replace("%", "", $request->discount));
+                $discount_value   = round(($price * $discount_percent) / 100, 2);
+            } else {
+                $discount_value = doubleval($request->discount);
+            }
+        }
+
+        // Check if product name already exists
+        if (Product::where('p_name', $attrs['p_name'])->exists()) {
+            return response([
+                'status'  => "0",
+                'message' => "Product already exists"
+            ], 409);
+        }
+
+        // Check category
+        $category = DB::table('categories')->where([
+            ['id', '=', $attrs['category_id']],
+            ['status', '=', 1]
+        ])->first();
+
+        if (!$category) {
+            return response([
+                'status'  => "0",
+                'message' => "Category not found or inactive"
+            ], 404);
+        }
+
+
+        // Upload Images
+        $images = [];
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $image) {
+                $imageName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+                $image->move(public_path('images'), $imageName);
+                $images[] = $imageName;
+            }
+        }
+
+        $product = Product::create([
+            "p_name"         => $attrs["p_name"],
+            "p_name_ar"      => $attrs["p_name_ar"],
+            "price"          => $price,
+            "tax"            => $tax_value,
+            "discount"       => $discount_value,
+            "taxable"        => $attrs["taxable"] ?? 0,
+            "tax_inclusive"  => $attrs["tax_inclusive"] ?? 0,
+            "category_id"    => $attrs['category_id'],
+            "shop_id"        => Auth::user()->id,
+            "images"         => json_encode($images),
+            "status"         => $attrs["status"] ?? 1,
+            "description"    => $attrs["description"] ?? null,
+            "description_ar" => $attrs["description_ar"] ?? null,
+            "extra_options"  => $attrs["extra_options"] ?? null
+        ]);
+
+        if ($product) {
+            $product['image_base_url'] = asset("images/");
+            return response([
+                "status"  => "1",
+                "product" => $product
+            ], 201);
         } else {
             return response([
-                'status' => "0",
-                "message" => "Shop not found"
-            ], 200);
+                "status"  => "0",
+                "message" => "Something went wrong"
+            ], 500);
         }
     }
 
-    public function updateProduct($id, Request $request)
+
+    public function updateProduct(Request $request, $id)
     {
-        
-        // print_r(auth()->user()->id); exit;
+        $product = Product::find($id);
+
+        if (!$product) {
+            return response([
+                'status'  => "0",
+                'message' => "Product not found"
+            ], 404);
+        }
+
         $attrs = $request->validate([
-            "p_name"=> "required|string",
-            "p_name_ar"=> "required|string",
-            "category_id"=> "required|int",
-            "price"=> "required|numeric",
-            ]);
+            "p_name"         => "sometimes|required|string|max:255",
+            "p_name_ar"      => "nullable|string|max:255",
+            "category_id"    => "sometimes|required|integer",
+            "price"          => "sometimes|required|numeric",
+            "tax"            => "nullable|string",
+            "discount"       => "nullable|string",
+            "taxable"        => "nullable|integer|in:0,1",
+            "tax_inclusive"  => "nullable|integer|in:0,1",
+            "status"         => "nullable|integer|in:0,1",
+            "description"    => "nullable|string",
+            "description_ar" => "nullable|string",
+            "extra_options"  => "nullable|string",
+            "images.*"       => "nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048"
+        ]);
 
-        // check if product name already exists
-        $product = DB::select("SELECT * FROM products WHERE p_name=:name AND id != :id", [':name' => $attrs['p_name'], ':id' => $id]);
-        if(!empty($product))
-        {
-            return response([
-                'status' => "0",
-                'message' => "Product already exist"
-            ], 200);
-        }
-
-        // check if tax in percentage
-        if(strpos($request->tax, "%") !== false)
-        {
-            // echo $request->tax; exit;
-            $tax_value = doubleval(str_replace("%","",$request->tax));
-            $tax_value = doubleval(($request->price*$tax_value)/100);
-            // echo $tax_value; exit;
-        } else {
-            $tax_value = $request->tax;
-        }
-
-        // check if discount in percentage
-        if(strpos($request->discount, "%") !== false)
-        {
-            // echo $request->discount; exit;
-            $discount_value = doubleval(str_replace("%","",$request->discount));
-            $discount_value = doubleval(($request->price*$discount_value)/100);
-            // echo $discount_value; exit;
-        } else {
-            $discount_value = $request->discount;
-        }
-
-
-        // check shop
-        $category = DB::select("SELECT * FROM categories WHERE id=:id AND status=:status",[':id' => $attrs['category_id'], ':status' => 1]);
-        if($category)
-        {
-            $data = DB::table('products')->where('id','=', $id)->first();
-            if($data)
-            {
-                $images = [];
-                if(isset($_FILES['images']))
-                {
-                    // print_r($_FILES['images']); exit;
-                    if ($request->hasFile('images')) {
-                        foreach ($request->file('images') as $image) {
-                            
-                            $imageName = time() . '_' . $image->getClientOriginalName();
-                            $image->move(public_path('images'), $imageName);
-                            // You may also store the image information in the database if needed.
-                            $images[] = $imageName;
-                        }
-            
-                    }
-                }
-
-                $product = DB::table('products')->where('id', '=', $id)->update([
-                    "p_name"=> $attrs["p_name"],
-                    "p_name_ar"=> $attrs["p_name_ar"],
-                    "price"=> $attrs["price"],
-                    "category_id"=> $attrs["category_id"],
-                    "images"=> count($images) > 0 ? json_encode($images) : $data->images,
-                    "description" => isset($request->description) ? $request->description : $data->description,
-                    "tax" => round($tax_value,2),
-                    "discount" => round($discount_value,2),
-                    "taxable" => isset($request->taxable) ? $request->taxable : $data->taxable,
-                    "tax_inclusive" => isset($request->tax_inclusive) ? $request->tax_inclusive : $data->tax_inclusive,
-                    "status" => isset($request->status) ? $request->status : $data->status
-                ]);
-    
-                if($product)
-                {
-                    return response([
-                        "status" => "1",
-                        "product" => json_decode(json_encode(DB::table('products')->where('id','=', $id)->first()), true),
-                        'image_base_url' => asset("images/"),
-                    ], 200);
-                } else {
-                    return response([
-                        "status"=> "0",
-                        "message" => "Something went wrong"
-                    ]);
-                }
-
-            } else {
+        if (isset($attrs['p_name'])) {
+            if (Product::where('p_name', $attrs['p_name'])->where('id', '!=', $id)->exists()) {
                 return response([
-                    'status' => "0",
-                    "message" => "Product not found"
-                ], 200);
+                    'status'  => "0",
+                    'message' => "Another product with this name already exists"
+                ], 409);
             }
+            $product->p_name = $attrs['p_name'];
+        }
+
+        if (isset($attrs['p_name_ar']))       $product->p_name_ar = $attrs['p_name_ar'];
+        if (isset($attrs['category_id'])) {
+            $category = DB::table('categories')->where([
+                ['id', '=', $attrs['category_id']],
+                ['status', '=', 1]
+            ])->first();
+
+            if (!$category) {
+                return response([
+                    'status'  => "0",
+                    'message' => "Category not found or inactive"
+                ], 404);
+            }
+            $product->category_id = $attrs['category_id'];
+        }
+
+        if (isset($attrs['price'])) $product->price = round($attrs['price'], 2);
+
+        // Tax
+        if ($request->has('tax')) {
+            $price = $product->price;
+            $tax_value = 0;
+            if (strpos($request->tax, "%") !== false) {
+                $tax_percent = doubleval(str_replace("%", "", $request->tax));
+                $tax_value   = round(($price * $tax_percent) / 100, 2);
+            } else {
+                $tax_value = doubleval($request->tax);
+            }
+            $product->tax = $tax_value;
+        }
+
+        // Discount
+        if ($request->has('discount')) {
+            $price = $product->price;
+            $discount_value = 0;
+            if (strpos($request->discount, "%") !== false) {
+                $discount_percent = doubleval(str_replace("%", "", $request->discount));
+                $discount_value   = round(($price * $discount_percent) / 100, 2);
+            } else {
+                $discount_value = doubleval($request->discount);
+            }
+            $product->discount = $discount_value;
+        }
+
+        if (isset($attrs['taxable']))        $product->taxable = $attrs['taxable'];
+        if (isset($attrs['tax_inclusive'])) $product->tax_inclusive = $attrs['tax_inclusive'];
+        if (isset($attrs['status']))        $product->status = $attrs['status'];
+        if (isset($attrs['description']))   $product->description = $attrs['description'];
+        if (isset($attrs['description_ar']))$product->description_ar = $attrs['description_ar'];
+        if (isset($attrs['extra_options'])) $product->extra_options = $attrs['extra_options'];
+
+        // Handle Images
+        if ($request->hasFile('images')) {
+            // If new images uploaded, delete old images from folder
+            $oldImages = json_decode($product->images, true) ?? [];
+            foreach ($oldImages as $img) {
+                $oldPath = public_path('images/' . $img);
+                if (file_exists($oldPath)) {
+                    @unlink($oldPath);
+                }
+            }
+
+            // Save new images
+            $images = [];
+            foreach ($request->file('images') as $image) {
+                $imageName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+                $image->move(public_path('images'), $imageName);
+                $images[] = $imageName;
+            }
+            $product->images = json_encode($images);
+        } elseif ($request->has('images') && $request->images === null) {
+            // If explicitly sent `images = null` then DO NOT change the existing images
+            // (so leave $product->images as is)
+        }
+
+        $product->updated_at = now();
+
+        if ($product->save()) {
+            $product['image_base_url'] = asset("images/");
+            return response([
+                "status"  => "1",
+                "message" => "Product updated successfully",
+                "product" => $product
+            ], 200);
         } else {
             return response([
-                'status' => "0",
-                "message" => "Shop not found"
-            ], 200);
+                "status"  => "0",
+                "message" => "Something went wrong"
+            ], 500);
         }
     }
+
 
     public function getProduct($id)
     {
@@ -290,20 +316,38 @@ class ProductController extends Controller
 
     public function delete($id)
     {
-        $product = Product::find( $id );
-        if($product->delete())
-        {
+        $product = Product::find($id);
+
+        if (!$product) {
             return response([
-                'status'=> '1',
-                'message' => "Product Delete successfully"
+                'status'  => "0",
+                'message' => "Product not found"
+            ], 404);
+        }
+
+        // Delete product images from folder
+        $images = json_decode($product->images, true) ?? [];
+        foreach ($images as $img) {
+            $path = public_path('images/' . $img);
+            if (file_exists($path)) {
+                @unlink($path);
+            }
+        }
+
+        // Delete the product
+        if ($product->delete()) {
+            return response([
+                "status"  => "1",
+                "message" => "Product and its images deleted successfully"
             ], 200);
         } else {
             return response([
-                "status"=> "0",
-                "message"=> "Something went wrong"
-            ],404);
+                "status"  => "0",
+                "message" => "Something went wrong"
+            ], 500);
         }
     }
+
 
     public function products($id)
     {

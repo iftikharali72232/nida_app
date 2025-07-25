@@ -15,13 +15,15 @@ class Product extends Model
         "price",
         "images",
         "shop_id",
-        "created_by",
         "status",
         "tax",
         "discount",
         "taxable",
         "tax_inclusive",
         "description",
+        "description_ar",
+        "extra_options",
+        "category_id",
     ];
     protected $hidden = [
     ];

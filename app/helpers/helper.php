@@ -5,6 +5,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use App\Models\Notification;
+use App\Models\Shop;
+use App\Models\Token;
+use App\Models\User;
+
 function removeImages($imageArray, $multi_images = 0) {
     // print_r($imageArray); exit;
     if($multi_images == 1)
@@ -144,7 +148,7 @@ function getFivePercent($amount) {
     return $percentage;
 }
 
- function storeNotification(array $data)
+    function storeNotification(array $data)
     {
         return Notification::create([
             'user_id'    => $data['user_id'] ?? null,
@@ -176,7 +180,7 @@ function getFivePercent($amount) {
         return $statuses[$lang][$status] ?? ($lang == 'ar' ? 'غير معروف' : 'Unknown');
     }
     
- function sendNotification($data)
+    function sendNotification($data)
     {
         // $deviceToken = $data['device_token'];
         // $title = $data['title'];
@@ -280,4 +284,151 @@ function getFivePercent($amount) {
         curl_close($ch);
 
         return json_decode($result, true);
+    }
+
+    function fvrt_shop($shop_id)
+    {
+        $user = Auth::user();
+        if($user) {
+            $shop = Shop::where('user_id', $user->id)->where('shop_id', $shop_id)->where('fvrt', 1)->first();
+            if($shop) {
+                return $shop; // Already favorited
+            }
+            $shop = Shop::create([
+                'user_id' => $user->id,
+                'fvrt' => 1,
+                'visted' => 0,
+                'shop_id' => $shop_id,
+            ]);
+            return $shop;
+        }
+    }
+
+    function un_fvrt_shop($shop_id)
+    {
+        $user = Auth::user();
+        if($user) {
+            $shop = Shop::where('user_id', $user->id)->where('shop_id', $shop_id)->first();
+            if($shop) {
+                $shop->delete();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function last_visited_shop($shop_id)
+    {
+        $user = Auth::user();
+        if($user) {
+            $shop = Shop::create([
+                'user_id' => $user->id,
+                'fvrt' => 0,
+                'visted' => 1,
+                'shop_id' => $shop_id,
+            ]);
+            return $shop;
+        }
+    }
+    
+ 
+
+    function fvrt_shop_list($perPage = 0)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return collect(); // empty
+        }
+
+        // Query with join & pagination
+        $shops = Shop::where('shops.user_id', $user->id)
+            ->where('shops.fvrt', 1)
+            ->join('users', 'shops.user_id', '=', 'users.id')
+            ->select(
+                'shops.*',
+                'users.name as user_name',
+                'users.mobile as user_mobile',
+                'users.email as user_email',
+                'users.image as user_image',
+                'users.id as user_id'
+            );
+             if($perPage == 0)
+            {
+                $shops = $shops->limit(5)->get();
+            } else {
+                $shops = $shops->paginate($perPage);
+            }
+
+        return $shops;
+    }
+
+    function last_visited_shop_list($perPage = 0)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return collect(); // empty
+        }
+
+        // Query with join & pagination
+        $shops = Shop::where('shops.user_id', $user->id)
+            ->where('shops.visted', 1)
+            ->join('users', 'shops.user_id', '=', 'users.id')
+            ->select(
+                'shops.*',
+                'users.name as user_name',
+                'users.mobile as user_mobile',
+                'users.email as user_email',
+                'users.image as user_image',
+                'users.id as user_id'
+            );
+            if($perPage == 0)
+            {
+                $shops = $shops->limit(5)->get();
+            } else {
+                $shops = $shops->paginate($perPage);
+            }
+
+            return $shops;    
+    }
+    function current_user_token()
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return null;
+        }
+
+       $token = Token::where('tokens.mobile', $user->mobile)
+            ->where('tokens.status', 'assigned')
+            ->join('users', 'tokens.user_shop_id', '=', 'users.id')
+            ->select(
+                'tokens.*',
+                'users.name as user_name',
+                'users.mobile as user_mobile',
+                'users.email as user_email',
+                'users.image as user_image',
+                'users.id as user_id'
+            )
+            ->orderByDesc('tokens.id')  // OR ->latest('tokens.created_at') if you have timestamps
+            ->first();
+
+        return $token; // null-safe
+    }
+    function shop_details($shop_id)
+    {
+        last_visited_shop($shop_id);
+        $shop = User::where('id', $shop_id)
+            ->select(
+
+                'users.name as user_name',
+                'users.mobile as user_mobile',
+                'users.email as user_email',
+                'users.image as user_image',
+                'users.id as user_id'
+            )
+            ->first();
+
+        return $shop;
     }
