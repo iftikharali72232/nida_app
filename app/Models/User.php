@@ -36,7 +36,8 @@ class User extends Authenticatable
         'description',
         'face_id',
         'device_token',
-        'notification_status'
+        'notification_status',
+        'master_category_id'
     ];
 
     /**

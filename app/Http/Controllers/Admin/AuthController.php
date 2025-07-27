@@ -1047,4 +1047,17 @@ class AuthController extends Controller
 
         return response()->json(['status' => true, 'message' => 'Image updated', 'data' => $user]);
     }
+     public function updateMasterCategory(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'master_category_id' => 'required|integer|exists:master_categories,id'
+        ]);
+
+        $user = $this->findUser($request);
+        $user->master_category_id = $request->master_category_id;
+        $user->save();
+
+        return response()->json(['status' => true, 'message' => 'Master category updated']);
+    }
 }

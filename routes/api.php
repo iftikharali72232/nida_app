@@ -26,6 +26,7 @@ use App\Http\Controllers\Location;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ServiceOfferController;
 use App\Http\Controllers\Admin\TokenController;
+    use App\Http\Controllers\Admin\MasterCategoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -143,7 +144,7 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
     Route::post('/createProduct', [ProductController::class, 'createProduct'])->name('createProduct');
     Route::get('/deleteProduct/{id}', [ProductController::class, 'delete'])->name('deleteProduct');
     Route::post('/updateProduct/{id}', [ProductController::class, 'updateProduct'])->name('updateProduct');
-    Route::get('/allProducts/{id}', [ProductController::class,'products'])->name('allProducts');
+    Route::post('/allProducts/{id}', [ProductController::class,'products'])->name('allProducts');
     Route::get('/sellerProducts', [ProductController::class, 'sellerProducts'])->name('sellerProducts');
     Route::post('/products/{id}/delete', [ProductController::class, 'delete']);
 
@@ -153,6 +154,9 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
     Route::post('/updateQunatity/{id}', [CartController::class, 'updateQunatity'])->name('updateQunatity');
     Route::get('/removeItem/{id}', [CartController::class, 'removeItem'])->name('removeItem');
     Route::post('/cartOrder', [CartController::class,'cartOrder'])->name('cartOrder');
+
+
+Route::get('/master-categories', [MasterCategoryController::class, 'index']);
 
     // Wish list Apis
     Route::post('/addWishList', [WishListController::class, 'add'])->name('addWishList');
@@ -241,4 +245,5 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
     Route::post('/user/update-mobile', [AuthController::class, 'updateMobile']);
     Route::post('/user/update-password', [AuthController::class, 'updatePassword']);
     Route::post('/user/update-image', [AuthController::class, 'updateImage']);
+    Route::post('/user/update-master-category', [AuthController::class, 'updateMasterCategory']);
 });

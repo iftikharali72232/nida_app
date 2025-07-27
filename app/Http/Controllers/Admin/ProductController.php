@@ -349,9 +349,15 @@ class ProductController extends Controller
     }
 
 
-    public function products($id)
-    {
-        $products = Product::orderBy("id","desc")->paginate(30);
+    public function products($id, Request $request)
+    { 
+        if(isset($request->category_id) && $request->category_id > 0)
+        {
+            $products = Product::where('category_id', $request->category_id)->orderBy("id","desc")->paginate(30);
+        } else {
+            $products = Product::orderBy("id","desc")->paginate(30);
+        }
+
         // print_r(json_decode(json_encode($products), true));
         if(count($products) > 0)
         {
