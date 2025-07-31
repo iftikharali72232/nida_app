@@ -17,6 +17,7 @@ class Product extends Model
         "shop_id",
         "status",
         "tax",
+        "redeem_points",
         "discount",
         "taxable",
         "tax_inclusive",

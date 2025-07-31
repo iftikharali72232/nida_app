@@ -9,144 +9,144 @@ use App\Models\Shop;
 use App\Models\Token;
 use App\Models\User;
 
-function removeImages($imageArray, $multi_images = 0) {
-    // print_r($imageArray); exit;
-    if($multi_images == 1)
-    {
-        foreach($imageArray as $img)
+    function removeImages($imageArray, $multi_images = 0) {
+        // print_r($imageArray); exit;
+        if($multi_images == 1)
         {
-            if(File::exists(public_path('/images/'.$img))) {
-            //     echo "success"; exit;
-                File::delete(public_path('/images/'.$img));
+            foreach($imageArray as $img)
+            {
+                if(File::exists(public_path('/images/'.$img))) {
+                //     echo "success"; exit;
+                    File::delete(public_path('/images/'.$img));
+                }
             }
+        } else {
+            if(File::exists(public_path('/images/'.$imageArray))) {
+                //     echo "success"; exit;
+                    File::delete(public_path('/images/'.$imageArray));
+                }
         }
-    } else {
-        if(File::exists(public_path('/images/'.$imageArray))) {
-            //     echo "success"; exit;
-                File::delete(public_path('/images/'.$imageArray));
-            }
+        
     }
-    
-}
 
-function formatDateTimeToEnglish($dateTimeString)
-{
-    $currentFormat = "Y-m-d H:i:s";
-    // Parse the input date and time string using Carbon
-    $dateTime = Carbon::createFromFormat($currentFormat, $dateTimeString);
+    function formatDateTimeToEnglish($dateTimeString)
+    {
+        $currentFormat = "Y-m-d H:i:s";
+        // Parse the input date and time string using Carbon
+        $dateTime = Carbon::createFromFormat($currentFormat, $dateTimeString);
 
-    // Format the date and time to English with AM/PM
-    $formattedDateTime = $dateTime->format('l, F j, Y g:i A');
+        // Format the date and time to English with AM/PM
+        $formattedDateTime = $dateTime->format('l, F j, Y g:i A');
 
-    return $formattedDateTime;
-}
-
-function formatCreatedAt($created_at) {
-    // Convert the created_at string to a DateTime object
-    $createdDateTime = new DateTime($created_at);
-    
-    // Get the current date and time
-    $currentDateTime = new DateTime();
-
-    // Calculate the difference between the current date and the created_at date
-    $interval = $currentDateTime->diff($createdDateTime);
-
-    // Check the difference and format accordingly
-    if ($interval->d > 0) {
-        // Less than one hour, show in minutes
-        return $interval->d . trans('lang.days_ago');
-    } elseif ($interval->h < 24) {
-        // Less than 24 hours, show in hours
-        return $interval->h . trans('lang.hours_ago');
-    } else {
-        // More than 24 hours, show in days
-        return $interval->i . trans('lang.minutes_ago');
+        return $formattedDateTime;
     }
-}
-function generateRandomCode() {
-    $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    $code = '';
-    $max = strlen($characters) - 1;
-    
-    for ($i = 0; $i < 10; $i++) {
-        $code .= $characters[mt_rand(0, $max)];
-    }
-    
-    return $code;
-}
-function send_message($data, $mobile)
-{
-    $ch = curl_init();
 
-    $payload = json_encode([
-        "messaging_product" => "whatsapp",
-        "recipient_type" => "individual",
-        "to" => $mobile,
-        "type" => "template",
-        "template" => [
-            "name" => "parcel_template_code",
-            "language" => ["code" => "en"],
-            "components" => [
-                [
-                    "type" => "body",
-                    "parameters" => [
-                        [
-                            "type" => "text",
-                            "text" => $data['code']
+    function formatCreatedAt($created_at) {
+        // Convert the created_at string to a DateTime object
+        $createdDateTime = new DateTime($created_at);
+        
+        // Get the current date and time
+        $currentDateTime = new DateTime();
+
+        // Calculate the difference between the current date and the created_at date
+        $interval = $currentDateTime->diff($createdDateTime);
+
+        // Check the difference and format accordingly
+        if ($interval->d > 0) {
+            // Less than one hour, show in minutes
+            return $interval->d . trans('lang.days_ago');
+        } elseif ($interval->h < 24) {
+            // Less than 24 hours, show in hours
+            return $interval->h . trans('lang.hours_ago');
+        } else {
+            // More than 24 hours, show in days
+            return $interval->i . trans('lang.minutes_ago');
+        }
+    }
+    function generateRandomCode() {
+        $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $code = '';
+        $max = strlen($characters) - 1;
+        
+        for ($i = 0; $i < 10; $i++) {
+            $code .= $characters[mt_rand(0, $max)];
+        }
+        
+        return $code;
+    }
+    function send_message($data, $mobile)
+    {
+        $ch = curl_init();
+
+        $payload = json_encode([
+            "messaging_product" => "whatsapp",
+            "recipient_type" => "individual",
+            "to" => $mobile,
+            "type" => "template",
+            "template" => [
+                "name" => "parcel_template_code",
+                "language" => ["code" => "en"],
+                "components" => [
+                    [
+                        "type" => "body",
+                        "parameters" => [
+                            [
+                                "type" => "text",
+                                "text" => $data['code']
+                            ]
                         ]
                     ]
                 ]
             ]
-        ]
-    ]);
-    curl_setopt($ch, CURLOPT_URL, 'https://graph.facebook.com/v16.0/116750164666647/messages');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        ]);
+        curl_setopt($ch, CURLOPT_URL, 'https://graph.facebook.com/v16.0/116750164666647/messages');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 
-    $headers = array();
-    $headers[] = 'Authorization: Bearer EAAHpsDJRFp0BO4BuWb3p8La3Nte3E8wccZCy5m4QJMV7X1NbSugSKVjZAy4nEBI2wevVpbDQ9RFKQdlHNeSwbDCA4GEzSxw4Rg8913V7u8LGin7vlbQymwHpWhCllY20xRSncKB0F026oq5jgKWM6fzxooX0H8jMc4YrputVvwQwvgDoDIF4ZBsbtR0iwCvAU7zZC6zz3ZAKI6rqG';
-    $headers[] = 'Content-Type: application/json';
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        $headers = array();
+        $headers[] = 'Authorization: Bearer EAAHpsDJRFp0BO4BuWb3p8La3Nte3E8wccZCy5m4QJMV7X1NbSugSKVjZAy4nEBI2wevVpbDQ9RFKQdlHNeSwbDCA4GEzSxw4Rg8913V7u8LGin7vlbQymwHpWhCllY20xRSncKB0F026oq5jgKWM6fzxooX0H8jMc4YrputVvwQwvgDoDIF4ZBsbtR0iwCvAU7zZC6zz3ZAKI6rqG';
+        $headers[] = 'Content-Type: application/json';
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-    $result = curl_exec($ch);
-    if (curl_errno($ch)) {
-        echo 'Error:' . curl_error($ch);
+        $result = curl_exec($ch);
+        if (curl_errno($ch)) {
+            echo 'Error:' . curl_error($ch);
+        }
+        curl_close($ch);
+        $result = json_decode($result, true);
+        return $result;
     }
-    curl_close($ch);
-    $result = json_decode($result, true);
-    return $result;
-}
-function cleanText($text) {
-    // Remove newlines and tabs
-    $text = str_replace(array("\n", "\r", "\t"), ' ', $text);
+    function cleanText($text) {
+        // Remove newlines and tabs
+        $text = str_replace(array("\n", "\r", "\t"), ' ', $text);
 
-    // Replace multiple spaces with a single space
-    $text = preg_replace('/ {2,}/', ' ', $text);
+        // Replace multiple spaces with a single space
+        $text = preg_replace('/ {2,}/', ' ', $text);
 
-    // Replace more than four consecutive spaces with four spaces
-    $text = preg_replace('/ {5,}/', '    ', $text);
+        // Replace more than four consecutive spaces with four spaces
+        $text = preg_replace('/ {5,}/', '    ', $text);
 
-    return $text;
-}
+        return $text;
+    }
 
-function subtractFivePercent($amount) {
-    // Calculate 5% of the amount
-    $percentage = $amount * 0.05;
+    function subtractFivePercent($amount) {
+        // Calculate 5% of the amount
+        $percentage = $amount * 0.05;
 
-    // Subtract 5% from the original amount
-    $remainingAmount = $amount - $percentage;
+        // Subtract 5% from the original amount
+        $remainingAmount = $amount - $percentage;
 
-    return $remainingAmount;
-}
+        return $remainingAmount;
+    }
 
-function getFivePercent($amount) {
-    // Calculate 5% of the amount
-    $percentage = $amount * 0.05;
+    function getFivePercent($amount) {
+        // Calculate 5% of the amount
+        $percentage = $amount * 0.05;
 
 
-    return $percentage;
-}
+        return $percentage;
+    }
 
     function storeNotification(array $data)
     {
@@ -345,13 +345,15 @@ function getFivePercent($amount) {
         $shops = Shop::where('shops.user_id', $user->id)
             ->where('shops.fvrt', 1)
             ->join('users', 'shops.user_id', '=', 'users.id')
+            ->leftJoin('points', 'points.shop_id', "=", "users.id")
             ->select(
                 'shops.*',
                 'users.name as user_name',
                 'users.mobile as user_mobile',
                 'users.email as user_email',
                 'users.image as user_image',
-                'users.id as user_id'
+                'users.id as user_id',
+                'points.available_points as shop_points'
             );
              if($perPage == 0)
             {
@@ -375,13 +377,15 @@ function getFivePercent($amount) {
         $shops = Shop::where('shops.user_id', $user->id)
             ->where('shops.visted', 1)
             ->join('users', 'shops.user_id', '=', 'users.id')
+            ->leftJoin('points', 'points.shop_id', "=", "users.id")
             ->select(
                 'shops.*',
                 'users.name as user_name',
                 'users.mobile as user_mobile',
                 'users.email as user_email',
                 'users.image as user_image',
-                'users.id as user_id'
+                'users.id as user_id',
+                'points.available_points as shop_points'
             );
             if($perPage == 0)
             {
@@ -431,4 +435,119 @@ function getFivePercent($amount) {
             ->first();
 
         return $shop;
+    }
+    function getShopPoints($shop_id)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return 0; // Return 0 if user is not authenticated
+        }
+        $points = DB::table('points')
+            ->where('shop_id', $shop_id)
+            ->where('user_id', $user->id)
+            ->select('available_points')
+            ->first();
+
+        return $points ? $points->available_points : 0; // Return 0 if no points found
+    }
+    function redeemPointRequest($pid, $shop_id, $points)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return false; // Return false if user is not authenticated
+        }
+
+        $point = DB::table('points')
+            ->where('shop_id', $shop_id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($point && $point->available_points >= $points) {
+            // Deduct points
+            DB::table('points')
+                ->where('shop_id', $shop_id)
+                ->where('user_id', $user->id)
+                ->decrement('available_points', $points);
+
+            // Create redeem request
+            DB::table('redeem_products')->insert([
+                'user_id' => $user->id,
+                'shop_id' => $shop_id,
+                'points' => $points,
+                'status' => 1, // Assuming 1 means pending
+                'product_id' => $pid,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return true; // Success
+        }
+
+        return false; // Not enough points or no points found
+    }
+    function useRedeemProduct($pid, $shop_id)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return false; // Return false if user is not authenticated
+        }
+        $code = generateRandomCode();
+        $codeExists = DB::table('redeem_products')
+            ->where('product_code', $code)
+            ->exists();
+        // Ensure the code is unique
+        while ($codeExists) {
+            $code = generateRandomCode();
+            $codeExists = DB::table('redeem_products')
+                ->where('product_code', $code)
+                ->exists();
+        }
+        // Check if redeem request exists and is pending
+        $redeem = DB::table('redeem_products')
+            ->where('product_id', $pid)
+            ->where('shop_id', $shop_id)
+            ->where('user_id', $user->id)
+            ->where('status', 1) // Assuming 1 means pending
+            ->orderBy('created_at', 'desc')
+            ->first(
+            ); // Get the most recent redeem request
+        // print_r($redeem); exit;
+        if ($redeem && $redeem->status == 1) { // Assuming 1 means pending
+            // Update redeem request to completed
+            DB::table('redeem_products')
+                ->where('id', $redeem->id)
+                ->update(['status' => 2, 'product_code' => $code]); // Assuming 2 means completed
+
+            return $code; // Success
+        }
+
+        return null; // Not found or not pending
+    }
+    function useRedeemCodeToSearchProduct($code)
+    {
+        $redeem = DB::table('redeem_products')
+            ->where('product_code', $code)
+            ->where('status', 2) // Assuming 2 means completed
+            ->orderBy('created_at', 'desc') // Get the most recent redeem request
+            ->first();
+
+        if ($redeem) {
+            return DB::table('products')
+                ->where('id', $redeem->product_id)
+                ->first();
+        }
+
+        return null;
+    }
+    function shopListAccordingToMasterCategory($master_category, $perPage = 0)
+    {
+        return DB::table('users')
+            ->where('master_category_id', $master_category)
+            ->paginate($perPage > 0 ? $perPage : 10, ['*'], 'shops');
+    }
+    function masterCategoryList()
+    {
+        return DB::table('master_categories')
+            ->select('id', 'name', 'name_ar', 'description', 'image')
+            ->get();
     }

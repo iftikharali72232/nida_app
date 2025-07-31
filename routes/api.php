@@ -132,6 +132,7 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
     Route::get('/deleteCategory/{id}', [CategoryController::class, 'delete'])->name('deleteCategory');
     Route::post('/updateCategory/{id}', [CategoryController::class, 'update'])->name('updateCategory');
     Route::get('/sellerCategories', [CategoryController::class, 'sellerCategories'])->name('sellerCategories');
+    Route::post('/explore', [CategoryController::class, 'exploreRequest'])->name('exploreCategories');
 
     // shop requests
     Route::post('/createShop', [ShopController::class,'create'])->name('createShop');
@@ -145,9 +146,12 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
     Route::get('/deleteProduct/{id}', [ProductController::class, 'delete'])->name('deleteProduct');
     Route::post('/updateProduct/{id}', [ProductController::class, 'updateProduct'])->name('updateProduct');
     Route::post('/allProducts/{id}', [ProductController::class,'products'])->name('allProducts');
-    Route::get('/sellerProducts', [ProductController::class, 'sellerProducts'])->name('sellerProducts');
+    Route::post('/pointProducts', [ProductController::class, 'pointProducts'])->name('pointProducts');
     Route::post('/products/{id}/delete', [ProductController::class, 'delete']);
-
+    Route::post('redeemProduct', [ProductController::class, 'redeemProduct'])->name('redeemProduct');
+    Route::post('useRedeemProduct', [ProductController::class, 'useRedeemProduct'])->name('useRedeemProduct');
+    Route::post('useRedeemCodeToGetProduct', [ProductController::class, 'useRedeemCodeToGetProduct'])->name('useRedeemCodeToGetProduct');
+    
     // Cart requests
     Route::post('/cart', [CartController::class,'cart'])->name('cart');
     Route::get('/cartView', [CartController::class, 'cartView'])->name('cartView');

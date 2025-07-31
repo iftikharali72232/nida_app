@@ -30,6 +30,7 @@ class ProductController extends Controller
             "description"    => "nullable|string",
             "description_ar" => "nullable|string",
             "extra_options"  => "nullable|string",
+            "redeem_points"  => "nullable|integer",
             "images.*"       => "nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048"
         ]);
 
@@ -103,7 +104,8 @@ class ProductController extends Controller
             "status"         => $attrs["status"] ?? 1,
             "description"    => $attrs["description"] ?? null,
             "description_ar" => $attrs["description_ar"] ?? null,
-            "extra_options"  => $attrs["extra_options"] ?? null
+            "extra_options"  => $attrs["extra_options"] ?? null,
+            "redeem_points" => $attrs["redeem_points"] ?? 0,
         ]);
 
         if ($product) {
@@ -144,6 +146,7 @@ class ProductController extends Controller
             "status"         => "nullable|integer|in:0,1",
             "description"    => "nullable|string",
             "description_ar" => "nullable|string",
+            "redeem_points"  => "nullable|integer",
             "extra_options"  => "nullable|string",
             "images.*"       => "nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048"
         ]);
@@ -353,9 +356,9 @@ class ProductController extends Controller
     { 
         if(isset($request->category_id) && $request->category_id > 0)
         {
-            $products = Product::where('category_id', $request->category_id)->orderBy("id","desc")->paginate(30);
+            $products = Product::where('category_id', $request->category_id)->where('shop_id', $id)->orderBy("id","desc")->paginate(30);
         } else {
-            $products = Product::orderBy("id","desc")->paginate(30);
+            $products = Product::where('shop_id', $id)->orderBy("id","desc")->paginate(30);
         }
 
         // print_r(json_decode(json_encode($products), true));
@@ -373,6 +376,111 @@ class ProductController extends Controller
         }
     }
 
+    public function pointProducts(Request $request)
+    { 
+        $request->validate([
+            'shop_id' => 'required|int'
+        ]);
+        $id = $request->shop_id;
+        // Get products with redeem points greater than 0 for the authenticated shop
+        $products = Product::where('shop_id', $id)->where('redeem_points', '>', 0)->orderBy("id","desc")->paginate(30);
+
+        // print_r(json_decode(json_encode($products), true));
+        if(count($products) > 0)
+        {
+            return response([
+                "status"=> "1",
+                "products"=> json_decode(json_encode($products), true),
+            ],200);
+        } else {
+            return response([
+                "status"=> "0",
+                "message"=> "Products not found"
+            ],200);
+        }
+    }
+    public function redeemProduct(Request $request)
+    {
+        $request->validate([
+            'product_id' => 'required|int',
+            'shop_id' => 'required|int',
+            'points' => 'required|int|min:1'
+        ]);
+
+        $product = Product::find($request->product_id);
+        if (!$product) {
+            return response([
+                'status' => 0,
+                'message' => 'Product not found'
+            ], 404);
+        }
+
+        $status = redeemPointRequest($request->product_id, $request->shop_id, $request->points);
+        if($status == true)
+        {
+            return response([
+                'status' => 1,
+                'message' => 'Product redeemed successfully'
+            ]);
+        } else {
+            return response([
+                'status' => 0,
+                'message' => 'Failed to redeem product. Please check your points or product availability.'
+            ], 400);
+        }
+        
+    }
+    public function useRedeemProduct(Request $request)
+    {
+        $request->validate([
+            'product_id' => 'required|int',
+            'shop_id' => 'required|int'
+        ]);
+
+        $product = Product::find($request->product_id);
+        if (!$product) {
+            return response([
+                'status' => 0,
+                'message' => 'Product not found'
+            ], 404);
+        }
+
+        $status = useRedeemProduct($request->product_id, $request->shop_id);
+        if($status !== null)
+        {
+            return response([
+                'status' => 1,
+                'code' => $status,
+                'message' => 'Product redeemed successfully'
+            ]);
+        } else {
+            return response([
+                'status' => 0,
+                'message' => 'Failed to redeem product. Please check your points or product availability.'
+            ], 400);
+        }
+        
+    }
+    public function useRedeemCodeToGetProduct(Request $request)
+    {
+        $attrs = $request->validate([
+            'code' => 'required|string'
+        ]);
+
+        $product = useRedeemCodeToSearchProduct($attrs['code']);
+        if ($product) {
+            return response([
+                'status' => 1,
+                'product' => json_decode(json_encode($product), true),
+                'image_base_url' => asset('images/')
+            ], 200);
+        } else {
+            return response([
+                'status' => 0,
+                'message' => 'Product not found.',
+            ], 200);
+        }
+    }
     public function searchProduct(Request $request)
     {
         $attrs = $request->validate([

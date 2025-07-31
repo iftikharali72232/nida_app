@@ -252,6 +252,35 @@ class CategoryController extends Controller
             ], 404);
         }
     }
+
+    public function exploreRequest(Request $request)
+    {
+        $request->validate([
+            'perPage' => 'nullable|integer|min:1'
+        ]);
+
+        $masterCategory = masterCategoryList();
+        
+        $masterCategory = json_decode(json_encode($masterCategory), true);
+        if(count($masterCategory) > 0) {
+            foreach ($masterCategory as $key => $category) {
+                $masterCategory[$key]['shops'] = shopListAccordingToMasterCategory($category['id'], $request->perPage);
+                // Add image URL to each category
+                if (!empty($category['image'])) {
+                    $masterCategory[$key]['imageUrl'] = asset('images/' . $category['image']);
+                } else {
+                    $masterCategory[$key]['imageUrl'] = null;
+                }
+            }
+        } else {
+            $masterCategory = [];
+        }
+        return response([
+            'status' => '1',
+            'masterCategory' => $masterCategory,
+            'image_base_url' => asset('images/')
+        ]);
+    }
     public function delete($id)
     {
         $category = Category::find( $id );
