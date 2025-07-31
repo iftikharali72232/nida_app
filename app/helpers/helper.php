@@ -345,7 +345,7 @@ use App\Models\User;
         $shops = Shop::where('shops.user_id', $user->id)
             ->where('shops.fvrt', 1)
             ->join('users', 'shops.user_id', '=', 'users.id')
-            ->leftJoin('points', 'points.shop_id', "=", "users.id")
+            ->leftJoin('points', 'points.shop_id', "=", "shops.shop_id")
             ->select(
                 'shops.*',
                 'users.name as user_name',
