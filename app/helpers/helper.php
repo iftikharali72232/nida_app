@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -377,7 +378,7 @@ use App\Models\User;
         $shops = Shop::where('shops.user_id', $user->id)
             ->where('shops.visted', 1)
             ->join('users', 'shops.user_id', '=', 'users.id')
-            ->leftJoin('points', 'points.shop_id', "=", "users.id")
+            ->leftJoin('points', 'points.shop_id', "=", "shops.shop_id")
             ->select(
                 'shops.*',
                 'users.name as user_name',
@@ -424,16 +425,12 @@ use App\Models\User;
     {
         last_visited_shop($shop_id);
         $shop = User::where('id', $shop_id)
-            ->select(
-
-                'users.name as user_name',
-                'users.mobile as user_mobile',
-                'users.email as user_email',
-                'users.image as user_image',
-                'users.id as user_id'
-            )
             ->first();
-
+        if (!$shop) {
+            return null; // Return null if shop not found
+        }
+        $shop->sub_categories = Category::where('shop_id', $shop->id)
+                                ->get();
         return $shop;
     }
     function getShopPoints($shop_id)

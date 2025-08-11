@@ -37,7 +37,8 @@ class User extends Authenticatable
         'face_id',
         'device_token',
         'notification_status',
-        'master_category_id'
+        'master_category_id',
+        'is_delete_verify'
     ];
 
     /**

@@ -114,6 +114,8 @@ Route::group(["middleware"=> "auth:sanctum"], function () {
         Route::post('/deleteCardDetails/{id}', [AuthController::class, 'deleteCardDetails'])->name('deleteCardDetails');
         Route::post('/updateVehicle', [AuthController::class, 'updateVehicle'])->name('updateVehicle');
         Route::post('/send-notification', [AuthController::class, 'send_push_notification'])->name('send_push_notification');
+        Route::post('/is_delete', [AuthController::class, 'is_delete'])->name('is_delete');
+        Route::post('/verifyOTPDeleteUser', [AuthController::class, 'verifyOTPDeleteUser'])->name('verifyOTPDeleteUser');
     });
     Route::prefix('notifications')->group(function () {
         Route::post('/store', [NotificationController::class, 'store']);

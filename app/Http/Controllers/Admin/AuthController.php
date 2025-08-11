@@ -88,7 +88,37 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'OTP verified successfully'], 200);
     }
+public function verifyOTPDeleteUser(Request $request)
+    {
+        $validated = $request->validate([
+            'otp' => 'required|numeric',
+        ]);
 
+        $user = Auth::user();
+        $user = User::find($user->id);
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        if ($user->otp !== $validated['otp']) {
+            return response()->json(['message' => 'Invalid OTP'], 400);
+        }
+
+        if (now()->greaterThan($user->otp_expiry)) {
+            return response()->json(['message' => 'OTP has expired'], 400);
+        }
+
+
+        // Mark the user as verified and clear the OTP
+        $user->update([
+            'is_delete_verify' => 1,
+            'otp' => null,
+            'otp_expiry' => null,
+            'status' => 0, // Set status to inactive
+        ]);
+
+        return response()->json(['message' => 'OTP verified successfully'], 200);
+    }
     public function resendOTP(Request $request)
     {
         $validated = $request->validate([
@@ -121,6 +151,30 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        // Generate a random 6-digit OTP
+        $otp = random_int(100000, 999999);
+
+        // Update the user's OTP and expiry time
+        $user->update([
+            'otp' => $otp,
+            'otp_expiry' => now()->addMinutes(5),
+        ]);
+
+        // Send the OTP email
+        Mail::to($user->email)->send(new OTPMail($otp));
+
+        return response()->json(['message' => 'An OTP has been sent to your email'], 200);
+    }
+    public function is_delete()
+    {
+
+        $user = Auth::user();
+        $user = User::find($user->id);
 
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
@@ -217,6 +271,13 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Invalid email, password, or user type',
             ], 401);
+        }
+
+        // Check if user is verified
+        if (!$user->status) {
+            return response()->json([
+                'message' => 'Your account is inactive or delete',
+            ], 403); // 403 Forbidden
         }
     
         // Check if user is verified
@@ -917,9 +978,9 @@ class AuthController extends Controller
         // Validate incoming data
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'nullable|email|unique:users,email,' . $id,
+            'email' => 'required|email|unique:users,email,' . $id,
             'mobile' => 'required|string|max:15|unique:users,mobile,' . $id,
-            'password' => 'nullable|string',
+            'password' => 'nullable|string|min:6|confirmed',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Max 2MB
         ]);
 
