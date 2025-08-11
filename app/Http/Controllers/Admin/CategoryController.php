@@ -51,6 +51,7 @@ class CategoryController extends Controller
             "description" => $request->description,
             "description_ar" => $request->description_ar,
             "admin_choice" => $request->admin_choice ?? 0,
+            "shop_id" => Auth::user()->id,
             "status" => $request->status ?? 1,
         ]);
 
